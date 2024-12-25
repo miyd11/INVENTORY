@@ -1397,4 +1397,6 @@ if __name__ == "__main__":
     #id INTEGER PRIMARY KEY AUTOINCREMENT,
     #category_name TEXT NOT NULL UNIQUE
 #);)
+#ALTER TABLE products
+#ADD COLUMN supplier INTEGER REFERENCES suppliers(id);
 
