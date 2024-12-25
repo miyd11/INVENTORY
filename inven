@@ -1,0 +1,1400 @@
+import tkinter as tk
+from tkinter import messagebox
+from tkinter import ttk
+import sqlite3
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from reportlab.lib import colors
+import os
+from datetime import datetime
+from tkinter import PhotoImage
+from PIL import Image, ImageTk
+import pandas as pd
+from tkinter import filedialog
+import csv
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+from reportlab.lib.styles import getSampleStyleSheet
+from datetime import datetime
+import math
+from reportlab.lib.pagesizes import A4
+from reportlab.platypus import Spacer
+from num2words import num2words
+from tkinter import simpledialog
+import locale
+
+locale.setlocale(locale.LC_ALL, 'en_IN.UTF-8')
+# Function to initialize the database
+def setup_database():
+    connection = sqlite3.connect("inventory.db")
+    cursor = connection.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS products (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            description TEXT NOT NULL,
+            category TEXT NOT NULL,
+            price REAL NOT NULL,
+            quantity INTEGER NOT NULL
+        )
+    """)
+    connection.commit()
+    connection.close()
+
+# Function to add a product
+def add_product(name, description, category, price, quantity):
+    # Validation for empty fields
+    if not name.strip() or not description.strip() or not category.strip():
+        print("Please fill all details.")
+        return
+   
+    try:
+        # Convert price and quantity
+        price = float(price)
+        quantity = int(quantity)
+    except ValueError:
+        print("Invalid price or quantity.")
+        return
+   
+    # Insert into database
+    try:
+        connection = sqlite3.connect("inventory.db")
+        cursor = connection.cursor()
+        cursor.execute(
+            "INSERT INTO products (name, description, category, price, quantity) VALUES (?, ?, ?, ?, ?)",
+            (name, description, category, price, quantity)
+        )
+        connection.commit()
+        print("Product added successfully.")
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
+    finally:
+        connection.close()
+       
+def db_connect():
+    return sqlite3.connect("inventory.db")
+
+# Function to remove a product
+def remove_product(self, product_id):
+    connection = sqlite3.connect("inventory.db")
+    cursor = connection.cursor()
+    cursor.execute("DELETE FROM products WHERE id = ?", (product_id,))
+    connection.commit()
+    connection.close()
+
+
+# Function to search products by category and description
+def search_products(category, description):
+    connection = sqlite3.connect("inventory.db")
+    cursor = connection.cursor()
+    cursor.execute("""
+        SELECT id, name, description, category, price, quantity, price * quantity AS total_price
+        FROM products
+        WHERE category = ? AND description LIKE ?
+    """, (category, '%' + description + '%'))
+    results = cursor.fetchall()
+    connection.close()
+    return results
+
+
+
+# Function to update quantity (Add or Remove Stock)
+def update_quantity(product_id, quantity_change):
+    connection = sqlite3.connect("inventory.db")
+    cursor = connection.cursor()
+    cursor.execute("UPDATE products SET quantity = quantity + ? WHERE id = ?", (quantity_change, product_id))
+    connection.commit()
+    connection.close()
+
+# Login Page Class
+
+class LoginPage:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("KEVT SOFTWARE ™")
+        self.root.geometry("1500x800")  # Adjusted window size
+        self.root.configure(bg="#f7f7f7")
+        self.set_window_icon("ino.png")
+
+        # Set up a canvas to handle the background image
+        self.canvas = tk.Canvas(self.root, width=600, height=400)
+        self.canvas.pack(fill="both", expand=True)
+
+        # Load the background image and adjust it
+        self.bg_image = Image.open("bg.jpg")  # Replace with your .jpg file
+        self.bg_image = self.bg_image.resize((1500, 800), Image.LANCZOS)  # Resize the image to fit window
+        self.bg_photo = ImageTk.PhotoImage(self.bg_image)
+
+        # Add background image to the canvas
+        self.canvas.create_image(0, 0, image=self.bg_photo, anchor="nw")
+
+        # Heading label for the company name
+        self.heading_label = tk.Label(self.root, text="KEVT INDIA PVT LTD", bg="#f7f7f7", fg="#333", font=("Arial", 24, "bold"))
+        self.heading_label.place(relx=0.5, rely=0.2, anchor="center")  # Position the heading centrally
+
+        # Login frame with a semi-transparent background color
+        self.login_frame = tk.Frame(self.root, bg="#e6f7ff", padx=40, pady=40)  # Increased size and padding
+        self.login_frame.place(relx=0.5, rely=0.55, anchor="center")  # Center the login frame more accurately
+
+        # Labels and entry widgets for username and password
+        tk.Label(self.login_frame, text="Username:", bg="#e6f7ff", font=("Arial", 14)).grid(row=0, column=0, sticky="w", pady=10)
+        self.username_entry = ttk.Entry(self.login_frame, width=30, font=("Arial", 14))
+        self.username_entry.grid(row=0, column=1, pady=10)
+
+        tk.Label(self.login_frame, text="Password:", bg="#e6f7ff", font=("Arial", 14)).grid(row=1, column=0, sticky="w", pady=10)
+        self.password_entry = ttk.Entry(self.login_frame, show="*", width=30, font=("Arial", 14))
+        self.password_entry.grid(row=1, column=1, pady=10)
+
+        # Bind Enter key for Username and Password fields
+        self.username_entry.bind("<Return>", lambda event: self.password_entry.focus_set())  # Move focus to Password field
+        self.password_entry.bind("<Return>", lambda event: self.check_credentials())  # Trigger login on Enter
+
+        # Login button with an attractive style
+        login_button = ttk.Button(self.login_frame, text="Login", command=self.check_credentials, width=20, style="LoginButton.TButton")
+        login_button.grid(row=2, column=0, columnspan=2, pady=20)
+
+        # Bind Enter key for Login button
+        self.root.bind("<Return>", lambda event: self.check_credentials())
+
+        # Style for the login button
+        button_style = ttk.Style()
+        button_style.configure("LoginButton.TButton", font=("Arial", 14, "bold"), background="#4CAF50", foreground="green")
+
+    def check_credentials(self):
+        # Hardcoded username and password
+        username = self.username_entry.get()
+        password = self.password_entry.get()
+
+        # For demo purposes, use hardcoded credentials
+        if username == "admin" and password == "admin123":
+            self.root.destroy()  # Close the login window
+            self.launch_inventory_app()  # Open the main inventory application
+        else:
+            messagebox.showerror("Login Failed", "Incorrect username or password. Please try again.")
+    def fetch_products_from_db(category="", description=""):
+        connection = sqlite3.connect("inventory.db")
+        cursor = connection.cursor()
+        cursor.execute("""
+            SELECT id, name, description, category, price, quantity
+            FROM products
+            WHERE category LIKE ? AND description LIKE ?
+        """, ('%' + category + '%', '%' + description + '%'))
+        results = cursor.fetchall()
+        connection.close()
+        return results
+    def set_window_icon(self, icon_path):
+        # Set the window icon using the PhotoImage class
+        try:
+            icon = PhotoImage(file=icon_path)
+        except Exception as e:
+            print("Error loading icon:", e)
+            return
+        self.root.iconphoto(False, icon)  #
+
+# Function to generate a PDF bill
+ 
+    def launch_inventory_app(self):
+        # Launch the main Inventory Application
+        root = tk.Tk()
+        app = InventoryApp(root)
+        root.mainloop()
+       
+
+# Main Inventory App Class
+
+class InventoryApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("KEVT SOFTWARE ™")
+        self.root.geometry("1500x800")
+        self.root.configure(bg="#f7f7f7")
+        self.set_window_icon("ino.png")# Set your icon file path here
+        self.name_suggestion_timer = None
+        self.conn = sqlite3.connect('inventory.db')
+        self.cursor = self.conn.cursor()
+        # Apply style to Notebook tabs
+        self.style = ttk.Style()
+        self.style.theme_use("default")  # Ensures we can override the style
+       
+        # Add style for selected and unselected tabs
+        self.style.configure("TNotebook.Tab", background="#d9f2d9", foreground="black", font=("Arial", 10, "bold"))  # Default Tab color
+        self.style.map("TNotebook.Tab", background=[("selected", "#90ee90")])  # Green color for selected tab
+
+        # Notebook for tabs
+        self.notebook = ttk.Notebook(self.root)
+        self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        # Tab 1 - Add Stock
+        self.add_product_tab = tk.Frame(self.notebook, bg="#f7f7f7")
+        self.notebook.add(self.add_product_tab, text="Add Stock")
+        self.add_product_tab_widgets()
+
+        # Tab 2 - Manage Stock
+        self.manage_product_tab = tk.Frame(self.notebook, bg="#f7f7f7")
+        self.notebook.add(self.manage_product_tab, text="Manage Stock")
+        self.manage_product_tab_widgets()
+
+        # Tab 3 - Category Summary
+        self.category_summary_tab = tk.Frame(self.notebook, bg="#f7f7f7")
+        self.notebook.add(self.category_summary_tab, text="Category Summary")
+        self.category_summary_tab_widgets()
+         # Tab 4 - View Items by Category and Add Supplier
+        self.view_items_tab = tk.Frame(self.notebook, bg="#f7f7f7")
+        self.notebook.add(self.view_items_tab, text="View Items / Add Supplier")
+        self.view_items_tab_widgets()
+
+        # Copyright Label at the bottom
+        self.add_copyright_label()
+        conn = sqlite3.connect('inventory.db')
+    
+    def view_items_tab_widgets(self):
+        """Initialize widgets for the View Items by Category tab with an attractive UI."""
+        # Frame for item list
+        self.view_frame = tk.LabelFrame(
+            self.view_items_tab,
+            text="Items by Category",
+            padx=20,
+            pady=20,
+            bg="#cce7ff",
+            font=("Helvetica", 18, "bold")
+        )
+        self.view_frame.place(x=20, y=20, width=800, height=650)
+
+        # Table for displaying items
+        columns = ("Product ID", "Product Name", "Category", "Description", "Supplier Name")
+        self.items_table = ttk.Treeview(
+            self.view_frame,
+            columns=columns,
+            show="headings",
+            height=15,
+        )
+        self.items_table.column("Product ID", width=0, stretch=tk.NO)  # Hide Product ID
+        for col in columns[1:]:
+            self.items_table.heading(col, text=col)
+            self.items_table.column(col, width=150, anchor="center")
+
+        # Style for Treeview
+        style = ttk.Style()
+        style.configure(
+            "Treeview.Heading",
+            font=("Helvetica", 14, "bold"),
+            foreground="white",
+            background="green",  # Header row color
+            padding=5
+        )
+        style.configure(
+            "Treeview",
+            font=("Helvetica", 12),
+            rowheight=25
+        )
+        self.items_table.pack(fill=tk.BOTH, expand=True)
+
+        # Dropdown for category selection
+        category_label = tk.Label(
+            self.view_frame,
+            text="Select Category:",
+            font=("Helvetica", 14, "bold"),
+            bg="#cce7ff",
+            fg="#003366"
+        )
+        category_label.pack(pady=10)
+
+        self.category_var = tk.StringVar()
+        self.category_dropdown = ttk.Combobox(
+            self.view_frame,
+            textvariable=self.category_var,
+            state="readonly",
+            font=("Helvetica", 12),
+            width=30
+        )
+        self.category_dropdown.pack(pady=10)
+
+        # Immediately populate category dropdown from database
+        self.populate_categories()
+
+        # Button to fetch items by selected category
+        fetch_button = ttk.Button(
+            self.view_frame,
+            text="Fetch Items",
+            command=self.fetch_items_by_category,
+            style="GreenButton.TButton"  # Custom button style
+        )
+        fetch_button.pack(pady=15)
+
+        # Add Supplier Section
+        self.supplier_frame = tk.LabelFrame(
+            self.view_items_tab,
+            text="Add Supplier",
+            padx=20,
+            pady=20,
+            bg="#cce7ff",
+            font=("Helvetica", 18, "bold")
+        )
+        self.supplier_frame.place(x=850, y=20, width=450, height=200)
+
+        tk.Label(
+            self.supplier_frame,
+            text="Supplier Name:",
+            bg="#cce7ff",
+            font=("Helvetica", 14, "bold"),
+            fg="#003366"
+        ).grid(row=0, column=0, pady=10, padx=10)
+
+        self.supplier_name_var = tk.StringVar()
+        self.supplier_name_entry = ttk.Entry(
+            self.supplier_frame,
+            textvariable=self.supplier_name_var,
+            font=("Helvetica", 12),
+            width=25
+        )
+        self.supplier_name_entry.grid(row=0, column=1, pady=10, padx=10)
+
+        # Add Supplier button
+        add_supplier_button = ttk.Button(
+            self.supplier_frame,
+            text="Add Supplier",
+            command=self.add_supplier,
+            style="GreenButton.TButton"  # Custom button style
+        )
+        add_supplier_button.grid(row=1, column=0, columnspan=2, pady=20)
+
+        # Styling for Buttons
+        style.configure(
+            "GreenButton.TButton",
+            font=("Helvetica", 14, "bold"),
+            background="green",
+            foreground="white",
+            padding=10
+        )
+
+        # Bind the selection event to handle item selection
+        self.items_table.bind("<<TreeviewSelect>>", self.on_item_select)
+
+        # Store the selected product's ID
+        self.selected_product_id = None
+
+    def populate_categories(self):
+        """Populate the category dropdown with available categories from the categories table."""
+        try:
+            # Query to fetch all categories from the categories table
+            query = "SELECT DISTINCT category_name FROM categories"
+            self.cursor.execute(query)
+            categories = [row[0] for row in self.cursor.fetchall()]
+
+            # Update dropdown options
+            self.category_dropdown["values"] = categories
+            if categories:
+                self.category_dropdown.current(0)  # Select the first category by default
+        except Exception as e:
+            print(f"Error fetching categories: {e}")
+
+
+
+    def on_item_select(self, event):
+        """Handle item selection in the Treeview."""
+        selected_item = self.items_table.selection()  # Get selected item
+        if selected_item:
+            item_values = self.items_table.item(selected_item[0], "values")
+            self.selected_product_id = item_values[0]  # Product ID
+            self.selected_product_name = item_values[1]  # Product Name
+            print(f"Selected Product: {self.selected_product_name} (ID: {self.selected_product_id})")
+
+
+
+    def fetch_items_by_category(self):
+        """Fetch and display items by the selected category."""
+        try:
+            selected_category = self.category_var.get()
+            if not selected_category:
+                print("Please select a category.")
+                return
+
+            # Query to fetch items for the selected category
+            query = """
+                SELECT p.id AS product_id,
+                       p.name AS product_name,
+                       p.category,
+                       p.description,
+                       IFNULL(s.name, 'No Supplier') AS supplier_name
+                FROM products p
+                LEFT JOIN suppliers s ON p.supplier = s.id
+                WHERE p.category = ?
+            """
+            self.cursor.execute(query, (selected_category,))
+            rows = self.cursor.fetchall()
+
+            # Clear the table
+            for row in self.items_table.get_children():
+                self.items_table.delete(row)
+
+            # Insert fetched data into the table
+            for row in rows:
+                self.items_table.insert("", tk.END, values=row)
+
+        except Exception as e:
+            print(f"Error fetching items: {e}")
+
+    def add_supplier(self):
+        """Add a supplier to the selected product."""
+        if self.selected_product_id is None:
+            print("No product selected.")
+            return
+
+        supplier_name = self.supplier_name_var.get().strip()
+        if not supplier_name:
+            print("Supplier name cannot be empty.")
+            return
+
+        try:
+            # Insert the supplier if it doesn't already exist and fetch its ID
+            query = """
+                INSERT INTO suppliers (name) 
+                VALUES (?)
+                ON CONFLICT(name) DO NOTHING
+            """
+            self.cursor.execute(query, (supplier_name,))
+            self.conn.commit()
+
+            # Fetch the supplier ID after insertion or if it already exists
+            query = "SELECT id FROM suppliers WHERE name = ?"
+            self.cursor.execute(query, (supplier_name,))
+            supplier_id_row = self.cursor.fetchone()
+
+            if supplier_id_row:
+                supplier_id = supplier_id_row[0]
+            else:
+                print("Error: Unable to fetch supplier ID.")
+                return
+
+            # Update the product with the new supplier ID
+            update_query = """
+                UPDATE products 
+                SET supplier = ? 
+                WHERE id = ?
+            """
+            self.cursor.execute(update_query, (supplier_id, self.selected_product_id))
+            self.conn.commit()
+
+            print(f"Supplier '{supplier_name}' added to product '{self.selected_product_name}'.")
+
+            # Optionally, refresh the table to show updated supplier name
+            self.fetch_items_by_category()
+
+        except Exception as e:
+            print(f"Error adding supplier: {e}")
+
+            
+    def set_window_icon(self, icon_path):
+        # Set the window icon using the PhotoImage class
+        try:
+            icon = PhotoImage(file=icon_path)
+        except Exception as e:
+            print("Error loading icon:", e)
+            return
+        self.root.iconphoto(False, icon)  # Set the icon
+    def add_copyright_label(self):
+        """Add a copyright label at the bottom of the window."""
+        copyright_label = tk.Label(self.root, text="© 2024 KEVT INDIA PVT LTD. All rights reserved.",
+                                   font=("Arial", 10, "italic"), bg="#f7f7f7", fg="black")
+        copyright_label.pack(side="bottom", fill="x", pady=5)
+
+    def add_product_tab_widgets(self):
+        """Initialize widgets for the Add Product tab."""
+        # Widgets for adding products
+        self.add_frame = tk.LabelFrame(
+            self.add_product_tab,
+            text="Add Stock",
+            padx=20,
+            pady=20,
+            bg="#e6f7ff",
+            font=("Arial", 14, "bold")
+        )
+        self.add_frame.place(x=20, y=20, width=750, height=600)
+
+        # Form for adding a product
+        font_style = ("Arial", 14, "bold")
+
+        # Product Name with Dropdown
+        tk.Label(self.add_frame, text="Name:", bg="#e6f7ff", font=font_style).grid(row=0, column=0, sticky="w", pady=10)
+        self.name_var = tk.StringVar()
+        self.name_combobox = ttk.Combobox(
+            self.add_frame,
+            textvariable=self.name_var,
+            width=27,
+            font=font_style,
+            state="readonly"  # Force selection from dropdown
+        )
+        self.name_combobox.grid(row=0, column=1, pady=10)
+
+        # Populate product names dynamically
+        self.fetch_product_names()
+
+        # Button to add new product name
+        # Define a custom style for the button
+        style = ttk.Style()
+        style.configure(
+            "AddNameButton.TButton",
+            font=("Arial", 12, "bold"),
+            background="green",  # Green background
+            foreground="white",    # White text
+            padding=10
+        )
+
+        # Create the button with the custom style
+        add_name_button = ttk.Button(
+            self.add_frame,
+            text="Add New Stock Name",
+            command=self.add_new_product_name,
+            style="AddNameButton.TButton"
+        )
+        add_name_button.grid(row=0, column=2, padx=10, pady=10)
+
+        # Description Entry
+        tk.Label(self.add_frame, text="Description:", bg="#e6f7ff", font=font_style).grid(row=1, column=0, sticky="w", pady=10)
+        self.description_var = tk.StringVar()
+        self.description_entry = ttk.Entry(self.add_frame, textvariable=self.description_var, width=30, font=font_style)
+        self.description_entry.grid(row=1, column=1, pady=10)
+
+        # Validation message for description
+        self.description_error_label = tk.Label(
+            self.add_frame,
+            text="",
+            fg="red",
+            bg="#e6f7ff",
+            font=("Arial", 10, "italic")
+        )
+        self.description_error_label.grid(row=1, column=2, sticky="w", padx=10)
+
+        # Add event binding for description validation
+        self.description_var.trace("w", self.validate_description)
+            # Category Dropdown
+        tk.Label(self.add_frame, text="Category:", bg="#e6f7ff", font=font_style).grid(row=2, column=0, sticky="w", pady=10)
+        self.category_var = tk.StringVar()
+        self.category_menu = ttk.Combobox(self.add_frame, textvariable=self.category_var, width=27, font=font_style)
+        self.category_menu.grid(row=2, column=1, pady=10)
+
+            # Populate categories dynamically
+        self.fetch_categories()
+
+        # Price Entry
+        tk.Label(self.add_frame, text="Price:", bg="#e6f7ff", font=font_style).grid(row=3, column=0, sticky="w", pady=10)
+        self.price_var = tk.StringVar()
+        self.price_entry = ttk.Entry(self.add_frame, textvariable=self.price_var, width=30, font=font_style)
+        self.price_entry.grid(row=3, column=1, pady=10)
+
+        # Validation message for Price
+        self.price_error_label = tk.Label(
+            self.add_frame,
+            text="",
+            fg="red",
+            bg="#e6f7ff",
+            font=("Arial", 10, "italic")
+        )
+        self.price_error_label.grid(row=3, column=2, sticky="w", padx=10)
+
+        # Quantity Entry
+        tk.Label(self.add_frame, text="Quantity:", bg="#e6f7ff", font=font_style).grid(row=4, column=0, sticky="w", pady=10)
+        self.quantity_var = tk.StringVar()
+        self.quantity_entry = ttk.Entry(self.add_frame, textvariable=self.quantity_var, width=30, font=font_style)
+        self.quantity_entry.grid(row=4, column=1, pady=10)
+
+        # Validation message for Quantity
+        self.quantity_error_label = tk.Label(
+            self.add_frame,
+            text="",
+            fg="red",
+            bg="#e6f7ff",
+            font=("Arial", 10, "italic")
+        )
+        self.quantity_error_label.grid(row=4, column=2, sticky="w", padx=10)
+
+        # Bind validations to the entries
+        self.price_var.trace("w", self.validate_price)
+        self.quantity_var.trace("w", self.validate_quantity)
+
+        # Add Product Button
+        # Define a custom style for the button
+        style = ttk.Style()
+        style.configure(
+            "AddButton.TButton",
+            font=("Arial", 14, "bold"),
+            background="blue",  # Green background
+            foreground="white",    # White text
+            padding=10
+        )
+
+# Create the 'Add Stock' button with the custom style
+        add_button = ttk.Button(self.add_frame, text="Add Stock", command=self.add_product, style="AddButton.TButton")
+        add_button.grid(row=5, column=0, columnspan=2, pady=20)
+
+
+
+        # Section to add a new category
+        self.add_category_frame = tk.LabelFrame(self.add_frame, text="Add New Category", padx=10, pady=10, bg="#e6f7ff")
+        self.add_category_frame.grid(row=6, column=0, columnspan=2, pady=20, padx=20)
+
+        tk.Label(self.add_category_frame, text="New Category:", bg="#e6f7ff", font=font_style).grid(row=0, column=0, sticky="w", pady=10)
+        self.new_category_entry = ttk.Entry(self.add_category_frame, width=25, font=font_style)
+        self.new_category_entry.grid(row=0, column=1, pady=10)
+
+        # Add New Category Button
+        # Define a custom style for the 'Add Category' button
+        style = ttk.Style()
+        style.configure(
+            "CategoryButton.TButton",
+            font=("Arial", 14, "bold"),
+            background="green",  # Orange background
+            foreground="white",    # White text
+            padding=10
+        )
+
+        # Create the 'Add Category' button with the custom style
+        add_category_button = ttk.Button(
+        self.add_category_frame,
+        text="Add Category",
+        command=self.add_new_category,
+        style="CategoryButton.TButton"
+        )
+        add_category_button.grid(row=1, column=0, columnspan=2, pady=10)
+       
+    def validate_description(self, *args):
+            """Validate if the description already exists in the database."""
+            description = self.description_var.get().strip()
+            if description:
+                try:
+                    conn = sqlite3.connect("inventory.db")
+                    cursor = conn.cursor()
+                    query = "SELECT COUNT(*) FROM products WHERE description = ?"
+                    cursor.execute(query, (description,))
+                    count = cursor.fetchone()[0]
+                    conn.close()
+
+                    if count > 0:
+                        self.description_error_label.config(text="Description already exists!")
+                    else:
+                        self.description_error_label.config(text="")
+                except sqlite3.Error as e:
+                    print(f"Error validating description: {e}")
+                    self.description_error_label.config(text="")
+            else:
+                self.description_error_label.config(text="")
+    def validate_price(self, *args):
+        """Validate the Price field to allow only numbers."""
+        price = self.price_var.get()
+        if not price or price.replace('.', '', 1).isdigit():  # Allow decimals
+            self.price_error_label.config(text="")
+        else:
+            self.price_error_label.config(text="Price must be a valid number!")
+
+    def validate_quantity(self, *args):
+        """Validate the Quantity field to allow only integers."""
+        quantity = self.quantity_var.get()
+        if not quantity or quantity.isdigit():  # Allow only integers
+            self.quantity_error_label.config(text="")
+        else:
+            self.quantity_error_label.config(text="Quantity must be a valid number!")
+
+    # The rest of the methods such as `fetch_categories`, `fetch_product_names`, `add_product`, etc., remain unchanged.
+
+
+    def add_product(self):
+            """Add a new product to the database."""
+            description = self.description_entry.get().strip()
+
+            if not description:
+                tk.messagebox.showerror("Input Error", "Description cannot be empty.")
+                return
+
+            # Final check for duplicate descriptions
+            if self.is_description_exists(description):
+                tk.messagebox.showwarning("Duplicate Entry", f"The description '{description}' already exists in the database.")
+                return
+
+            # Proceed with adding the product (remaining code as shown earlier)
+            # ...
+
+            """Add a new product to the database and update the product list."""
+            try:
+                name = self.name_var.get()
+                description = self.description_entry.get()
+                category = self.category_var.get()
+                price = float(self.price_entry.get())
+                quantity = int(self.quantity_entry.get())
+
+                # Example database insert query
+                query = """
+                INSERT INTO products (product_name, description, category, price, quantity)
+                VALUES (%s, %s, %s, %s, %s)
+                """
+                cursor = self.db_connection.cursor()  # Replace with your DB connection
+                cursor.execute(query, (name, description, category, price, quantity))
+                self.db_connection.commit()
+                cursor.close()
+
+                # Immediately update the product name list
+                self.fetch_product_names()
+
+                # Clear the input fields
+                self.name_var.set("")
+                self.description_entry.delete(0, tk.END)
+                self.category_var.set("")
+                self.price_entry.delete(0, tk.END)
+                self.quantity_entry.delete(0, tk.END)
+
+                # Provide feedback
+                print(f"Product '{name}' added successfully!")
+            except Exception as e:
+                print(f"Error adding product: {e}")
+
+    def add_new_category(self):
+            """Add a new category to the database and update the dropdowns."""
+            new_category = self.new_category_entry.get().strip()
+            if not new_category:
+                messagebox.showerror("Error", "Category name cannot be empty.")
+                return
+           
+            try:
+                # Insert the new category into the database
+                conn = sqlite3.connect("inventory.db")
+                cursor = conn.cursor()
+                cursor.execute("INSERT INTO categories (category_name) VALUES (?)", (new_category,))
+                conn.commit()
+                conn.close()
+
+                messagebox.showinfo("Success", f"Category '{new_category}' added successfully!")
+               
+                # Clear the entry field
+                self.new_category_entry.delete(0, tk.END)
+               
+                # Update the category dropdowns in both tabs
+                self.fetch_categories_manage()
+                self.fetch_categories()
+            except sqlite3.Error as e:
+                messagebox.showerror("Error", f"Failed to add category: {e}")
+
+    def fetch_categories(self):
+        """Fetch categories dynamically for the Add Product tab."""
+        try:
+            conn = sqlite3.connect("inventory.db")
+            cursor = conn.cursor()
+            cursor.execute("SELECT DISTINCT category_name FROM categories")
+            categories = [row[0] for row in cursor.fetchall()]
+            conn.close()
+           
+            # Update the category dropdown
+            self.category_menu['values'] = categories
+        except sqlite3.Error as e:
+            print(f"Error fetching categories: {e}")
+    def fetch_product_names(self):
+        """Fetch product names dynamically for the dropdown."""
+        try:
+            conn = sqlite3.connect("inventory.db")
+            cursor = conn.cursor()
+            cursor.execute("SELECT DISTINCT name FROM products")
+            product_names = [row[0] for row in cursor.fetchall()]
+            conn.close()
+
+            # Update the combobox
+            self.name_combobox['values'] = product_names
+        except sqlite3.Error as e:
+            print(f"Error fetching product names: {e}")
+
+# Function to add a new product name
+    def add_new_product_name(self):
+        """Add a new product name to the database and update the dropdown."""
+        new_name = simpledialog.askstring("New Product Name", "Enter the new product name:")
+        if not new_name or new_name.strip() == "":
+            messagebox.showerror("Error", "Product name cannot be empty.")
+            return
+
+        try:
+            conn = sqlite3.connect("inventory.db")
+            cursor = conn.cursor()
+
+            # Provide default values for NOT NULL columns
+            query = """
+            INSERT INTO products (name, description, category, price, quantity)
+            VALUES (?, ?, ?, ?, ?)
+            """
+            cursor.execute(query, (new_name.strip(), "Default Description", "Default Category", 0.0, 0))
+            conn.commit()
+            conn.close()
+
+            # Update the product name list
+            self.fetch_product_names()
+            messagebox.showinfo("Success", f"Product name '{new_name}' added successfully!")
+        except sqlite3.IntegrityError as e:
+            messagebox.showerror("Database Error", f"Integrity constraint error: {e}")
+        except sqlite3.Error as e:
+            messagebox.showerror("Database Error", f"An error occurred: {e}")
+
+    def manage_product_tab_widgets(self):
+        # Tab 2 - Manage Products
+        self.manage_frame = tk.LabelFrame(
+            self.manage_product_tab,
+            text="Manage Stocks",
+            padx=20,
+            pady=20,
+            bg="#e6f7ff",
+            font=("Arial", 14, "bold")
+        )
+        self.manage_frame.place(x=20, y=70, width=1300, height=550)
+
+        font_style = ("Arial", 14, "bold")
+
+        # Category Label and Combobox
+        tk.Label(self.manage_frame, text="Category:", bg="#e6f7ff", font=font_style).grid(row=0, column=0, sticky="w", pady=10)
+        self.search_category_var = tk.StringVar()
+        self.search_category_menu = ttk.Combobox(self.manage_frame, textvariable=self.search_category_var, width=25, font=font_style)
+        self.search_category_menu.grid(row=0, column=1, pady=10, padx=10)
+
+        # Fetch categories dynamically from the database
+        self.fetch_categories_manage()
+
+        # Description Label and Entry
+        tk.Label(self.manage_frame, text="Description:", bg="#e6f7ff", font=font_style).grid(row=0, column=2, sticky="w", pady=10)
+        self.search_description_entry = ttk.Entry(self.manage_frame, width=25, font=font_style)
+        self.search_description_entry.grid(row=0, column=3, pady=10, padx=10)
+
+        # Bind Enter key for Name and Description fields
+        self.search_category_menu.bind("<Return>", lambda event: self.search_products_in_db())
+        self.search_description_entry.bind("<Return>", lambda event: self.search_products_in_db())
+
+        # Button Style
+        button_style = ttk.Style()
+        button_style.configure("Custom.TButton", font=("Arial", 12, "bold"), background="blue", foreground="white")
+
+        # Search Button
+        search_button = ttk.Button(self.manage_frame, text="Search", command=self.search_products_in_db, style="Custom.TButton")
+        search_button.grid(row=0, column=4, pady=10, padx=10)
+
+        # Inwards and Outwards Quantity Buttons
+        inwards_button = ttk.Button(self.manage_frame, text="Inwards Quantity", command=self.inwards_quantity, style="Custom.TButton")
+        inwards_button.grid(row=1, column=0, padx=10, pady=10)
+
+        outwards_button = ttk.Button(self.manage_frame, text="Outwards Quantity", command=self.outwards_quantity, style="Custom.TButton")
+        outwards_button.grid(row=1, column=1, padx=10, pady=10)
+
+        # Export to CSV Button
+        export_button = ttk.Button(self.manage_frame, text="Export to CSV", command=self.export_to_csv, style="Custom.TButton")
+        export_button.grid(row=1, column=2, padx=10, pady=10)
+
+        # Remove Product Button
+        remove_button = ttk.Button(self.manage_frame, text="Remove Product", command=self.remove_selected_product, style="Custom.TButton")
+        remove_button.grid(row=1, column=3, padx=10, pady=10)
+
+        # Edit Price Button
+        edit_price_button = ttk.Button(self.manage_frame, text="Edit Price", command=self.edit_price, style="Custom.TButton")
+        edit_price_button.grid(row=1, column=4, padx=10, pady=10)
+
+        # Edit Description Button
+        edit_description_button = ttk.Button(self.manage_frame, text="Edit Description", command=self.edit_description, style="Custom.TButton")
+        edit_description_button.grid(row=1, column=6, padx=10, pady=10)
+
+        # Create the Treeview widget
+        style = ttk.Style()
+        style.configure(
+            "Custom.Treeview",
+            font=("Arial", 14),  # Larger font size for table text
+            rowheight=30         # Increase row height to match the font size
+        )
+        style.configure(
+            "Custom.Treeview.Heading",
+            font=("Arial", 14, "bold"),  # Larger font for headers
+            background="#4CAF50",        # Header background color
+            foreground="white",          # Header text color
+            bordercolor="black",         # Border color for headers
+            relief="raised"              # Header style
+        )
+        style.map(
+            "Custom.Treeview.Heading",
+            background=[("active", "#45a049")]  # Change header background on hover
+        )
+
+        self.product_tree = ttk.Treeview(
+            self.manage_frame,
+            columns=("ID", "Name", "Description", "Category", "Price", "Quantity", "Total Price"),
+            show="headings",
+            height=10,
+            style="Custom.Treeview"  # Apply custom style
+        )
+
+        # Define table headings
+        self.product_tree.heading("ID", text="ID")
+        self.product_tree.heading("Name", text="Name")
+        self.product_tree.heading("Description", text="Description")
+        self.product_tree.heading("Category", text="Category")
+        self.product_tree.heading("Price", text="Price")
+        self.product_tree.heading("Quantity", text="Quantity")
+        self.product_tree.heading("Total Price", text="Total Price")
+
+        # Adjust column widths for better visibility
+        self.product_tree.column("ID", width=100, anchor="center")
+        self.product_tree.column("Name", width=150, anchor="center")
+        self.product_tree.column("Description", width=200, anchor="w")
+        self.product_tree.column("Category", width=150, anchor="center")
+        self.product_tree.column("Price", width=120, anchor="e")  # Align numbers to the right
+        self.product_tree.column("Quantity", width=120, anchor="center")
+        self.product_tree.column("Total Price", width=150, anchor="e")  # Align numbers to the right
+
+        # Place the Treeview widget
+        self.product_tree.grid(row=2, column=0, columnspan=5, pady=20, padx=20)
+
+        # Add a Scrollbar for the Treeview
+        tree_scroll = ttk.Scrollbar(self.manage_frame, orient="vertical", command=self.product_tree.yview)
+        tree_scroll.grid(row=2, column=5, sticky="ns", pady=20)  # Place scrollbar next to the table
+        self.product_tree.configure(yscrollcommand=tree_scroll.set)
+
+        # Formatting the 'Price' and 'Total Price' columns with Indian Place Value System
+        locale.setlocale(locale.LC_ALL, 'en_IN')  # Set locale to Indian format
+        for item in self.product_tree.get_children():
+            values = self.product_tree.item(item, "values")
+            price = int(float(values[4]))  # Assuming 5th column is price
+            total_price = int(float(values[6]))  # Assuming 7th column is total price
+
+            formatted_price = locale.format_string("%d", price, grouping=True)
+            formatted_total_price = locale.format_string("%d", total_price, grouping=True)
+
+            # Update item with formatted price and total price
+            self.product_tree.item(item, values=(
+                values[0], values[1], values[2], values[3], formatted_price, values[5], formatted_total_price
+            ))
+    def populate_product_tree(self, data):
+        # Set locale to Indian format
+        locale.setlocale(locale.LC_ALL, 'en_IN')
+
+        # Clear existing rows in the Treeview
+        for item in self.product_tree.get_children():
+            self.product_tree.delete(item)
+
+        # Add new rows with formatted prices
+        for row in data:
+            price = int(float(row[4]))  # Assuming 5th column is price
+            total_price = int(float(row[6]))  # Assuming 7th column is total price
+
+            formatted_price = locale.format_string("%d", price, grouping=True)
+            formatted_total_price = locale.format_string("%d", total_price, grouping=True)
+
+            # Insert data into Treeview with formatted values
+            self.product_tree.insert("", "end", values=(
+                row[0], row[1], row[2], row[3], formatted_price, row[5], formatted_total_price
+            ))
+    def fetch_products_from_db(self):
+        # Example database query to fetch data
+        query = "SELECT id, name, description, category, price, quantity, (price * quantity) AS total_price FROM products"
+        self.cursor.execute(query)
+        data = self.cursor.fetchall()
+
+        # Populate Treeview with the fetched data
+        self.populate_product_tree(data)
+
+    def fetch_categories_manage(self):
+        """Fetch categories dynamically for the Manage Products tab."""
+        try:
+            conn = sqlite3.connect("inventory.db")
+            cursor = conn.cursor()
+            cursor.execute("SELECT DISTINCT category_name FROM categories")
+            categories = [row[0] for row in cursor.fetchall()]
+            conn.close()
+           
+            # Update the category dropdown
+            self.search_category_menu['values'] = categories
+        except sqlite3.Error as e:
+            print(f"Error fetching categories: {e}")
+
+
+
+    def edit_price(self):
+        # Get the selected item from the Treeview
+        selected_item = self.product_tree.selection()
+        if not selected_item:
+            messagebox.showerror("Selection Error", "Please select a product to edit.")
+            return
+
+        # Get the current price of the selected product
+        item_values = self.product_tree.item(selected_item)["values"]
+        current_price = item_values[4]  # The price is at index 4
+
+        # Create a simple dialog to enter the new price
+        new_price = simpledialog.askfloat("Edit Price", f"Enter new price for {item_values[1]} (Current Price: {current_price}):", minvalue=0.01)
+       
+        if new_price is None:
+            return  # User canceled the dialog
+
+        # Update the price in the database
+        try:
+            conn = sqlite3.connect("inventory.db")  # Replace with your database path
+            cursor = conn.cursor()
+           
+            # Update the price of the selected product
+            cursor.execute("UPDATE products SET price = ? WHERE id = ?", (new_price, item_values[0]))
+            conn.commit()
+
+            # Update the Treeview item to reflect the new price
+            self.product_tree.item(selected_item, values=(item_values[0], item_values[1], item_values[2], item_values[3], new_price, item_values[5], item_values[6]))
+            messagebox.showinfo("Success", "Product price updated successfully!")
+        except sqlite3.Error as e:
+            messagebox.showerror("Database Error", f"An error occurred: {e}")
+        finally:
+            conn.close()
+    def edit_description(self):
+        # Get the selected item from the Treeview
+        selected_item = self.product_tree.selection()
+        if not selected_item:
+            messagebox.showerror("Selection Error", "Please select a product to edit.")
+            return
+
+        # Get the current description of the selected product
+        item_values = self.product_tree.item(selected_item)["values"]
+        current_description = item_values[2]  # The description is at index 2
+
+        # Create a simple dialog to enter the new description
+        new_description = simpledialog.askstring("Edit Description", f"Enter new description for {item_values[1]} (Current Description: {current_description}):")
+       
+        if not new_description:
+            return  # User canceled or didn't provide a description
+
+        # Update the description in the database
+        try:
+            conn = sqlite3.connect("innventory.db")  # Replace with your database path
+            cursor = conn.cursor()
+           
+            # Update the description of the selected product
+            cursor.execute("UPDATE products SET description = ? WHERE id = ?", (new_description, item_values[0]))
+            conn.commit()
+
+            # Update the Treeview item to reflect the new description
+            self.product_tree.item(selected_item, values=(item_values[0], item_values[1], new_description, item_values[3], item_values[4], item_values[5], item_values[6]))
+            messagebox.showinfo("Success", "Product description updated successfully!")
+        except sqlite3.Error as e:
+            messagebox.showerror("Database Error", f"An error occurred: {e}")
+        finally:
+            conn.close()
+    def remove_selected_product(self):
+        # Get the selected item from the Treeview
+        selected_item = self.product_tree.focus()  # Treeview to show products
+        if not selected_item:
+            messagebox.showerror("Error", "Please select a product to delete.")
+            return
+
+        # Get product ID from the selected row
+        product_id = self.product_tree.item(selected_item, 'values')[0]  # Assuming ID is in the first column
+       
+        # Confirm deletion
+        confirm = messagebox.askokcancel("Confirm Deletion", "Are you sure you want to delete this product?")
+        if confirm:
+            try:
+                # Call the function to delete the product from the database
+                self.remove_product(product_id)
+
+                # Remove the item from the Treeview
+                self.product_tree.delete(selected_item)
+               
+                messagebox.showinfo("Success", "Product deleted successfully!")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to delete product: {e}")
+               
+    def remove_product(self, product_id):
+        connection = sqlite3.connect("inventory.db")
+        cursor = connection.cursor()
+        cursor.execute("DELETE FROM products WHERE id = ?", (product_id,))
+        connection.commit()
+        connection.close()
+
+
+
+    def export_to_csv(self):
+        # Fetch data from the Treeview and group by category
+        category_totals = {}
+
+        for row in self.product_tree.get_children():
+            product = self.product_tree.item(row)['values']
+            category = product[3]
+            total_price = float(product[6][1:].replace(',', ''))  # Remove ₹ and commas to get the number
+
+            # Accumulate totals by category
+            if category not in category_totals:
+                category_totals[category] = 0
+            category_totals[category] += total_price
+
+        # Now, export to CSV
+        with open("product_summary.csv", "w", newline="") as csvfile:
+            csv_writer = csv.writer(csvfile)
+
+            # Write headers
+            csv_writer.writerow(["ID", "Name", "Description", "Category", "Price", "Quantity", "Total Price"])
+
+            # Write product data
+            for row in self.product_tree.get_children():
+                product = self.product_tree.item(row)['values']
+                csv_writer.writerow(product)
+
+            # Write category-wise total at the end
+            csv_writer.writerow(["Category", "Total Amount"])
+            for category, total in category_totals.items():
+                csv_writer.writerow([category, f"₹{total:.2f}"])
+
+
+
+    def inwards_quantity(self):
+        selected_item = self.product_tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Select Product", "Please select a product first.")
+            return
+
+        product_id = self.product_tree.item(selected_item)["values"][0]
+        quantity_to_add = tk.simpledialog.askinteger("Inwards Quantity", "Enter quantity to add:")
+        if quantity_to_add and quantity_to_add > 0:
+            update_quantity(product_id, quantity_to_add)
+            messagebox.showinfo("Success", f"Added {quantity_to_add} units to the product.")
+            self.search_products_in_db()
+
+    def outwards_quantity(self):
+        selected_item = self.product_tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Select Product", "Please select a product first.")
+            return
+
+        product_id = self.product_tree.item(selected_item)["values"][0]
+        quantity_to_remove = tk.simpledialog.askinteger("Outwards Quantity", "Enter quantity to remove:")
+        if quantity_to_remove and quantity_to_remove > 0:
+            update_quantity(product_id, -quantity_to_remove)
+            messagebox.showinfo("Success", f"Removed {quantity_to_remove} units from the product.")
+            self.search_products_in_db()
+    def export_to_csv(self):
+        file_path = tk.filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")])
+        if file_path:
+            with open(file_path, mode="w", newline="") as file:
+                writer = csv.writer(file)
+                writer.writerow(["ID", "Name", "Description", "Category", "Price", "Quantity", "Total Price"])
+                for row in self.product_tree.get_children():
+                    row_data = self.product_tree.item(row)["values"]
+                    writer.writerow(row_data)
+            messagebox.showinfo("Export Successful", f"Data exported to {file_path}")
+
+    import sqlite3
+
+# Method to define Category Summary Tab with additional Quantity Available column
+    # Method to define Category Summary Tab with additional Quantity Available column
+    def category_summary_tab_widgets(self):
+        """Initialize widgets for the Category Summary tab."""
+        # Frame for Category Summary
+        self.summary_frame = tk.LabelFrame(
+            self.category_summary_tab,
+            text="Category Summary",
+            padx=20,
+            pady=20,
+            bg="#e6f7ff",
+            font=("Arial", 16, "bold")
+        )
+        self.summary_frame.place(x=20, y=20, width=1000, height=600)  # Adjusted size for better visibility
+
+        # Frame for Treeview
+        self.summary_tree_frame = tk.Frame(self.summary_frame, bg="#e6f7ff")
+        self.summary_tree_frame.place(x=10, y=10, width=960, height=350)  # Reduced height to make space for buttons
+
+        # Scrollbar
+        self.scrollbar = ttk.Scrollbar(self.summary_tree_frame, orient=tk.VERTICAL)
+        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Define Treeview Style
+        style = ttk.Style()
+        style.configure(
+            "Custom.Treeview",
+            font=("Arial", 14),  # Row font
+            rowheight=30  # Increase row height
+        )
+        style.configure(
+            "Custom.Treeview.Heading",
+            font=("Arial", 16, "bold"),  # Header font
+            background="#1388c2"
+        )
+
+        # Treeview (Table Structure)
+        self.category_summary_list = ttk.Treeview(
+            self.summary_tree_frame,
+            style="Custom.Treeview",
+            columns=("Category", "Total Amount", "Quantity Available"),
+            show="headings",
+            yscrollcommand=self.scrollbar.set,
+            height=10  # Adjust for visible rows
+        )
+        self.scrollbar.config(command=self.category_summary_list.yview)
+
+        # Set up headings
+        self.category_summary_list.heading("Category", text="Category")
+        self.category_summary_list.heading("Total Amount", text="Total Amount")
+        self.category_summary_list.heading("Quantity Available", text="Quantity Available")
+
+        # Set column widths
+        self.category_summary_list.column("Category", width=350, anchor=tk.W)
+        self.category_summary_list.column("Total Amount", width=250, anchor=tk.CENTER)
+        self.category_summary_list.column("Quantity Available", width=250, anchor=tk.CENTER)
+
+        # Styling for rows and cells
+        self.category_summary_list.tag_configure("oddrow", background="#f9f9f9")
+        self.category_summary_list.tag_configure("evenrow", background="#ffffff")
+
+        # Add Treeview
+        self.category_summary_list.pack(fill=tk.BOTH, expand=True)
+
+        # Action Buttons Frame
+        self.summary_action_frame = tk.Frame(self.summary_frame, bg="#e6f7ff")
+        self.summary_action_frame.place(x=10, y=370, width=960, height=200)  # Adjusted placement and height
+
+        # Refresh Button
+        refresh_button = ttk.Button(
+            self.summary_action_frame,
+            text="Refresh Summary",
+            command=self.refresh_category_summary,
+            style="Red.TButton"
+        )
+        refresh_button.grid(row=0, column=0, padx=20, pady=20, sticky="ew")
+
+        # Export to CSV Button
+        export_button = ttk.Button(
+            self.summary_action_frame,
+            text="Export to CSV",
+            command=self.export_category_summary_to_csv,
+            style="Green.TButton"
+        )
+        export_button.grid(row=0, column=1, padx=20, pady=20, sticky="ew")
+
+        # Configure grid weights for proper button alignment
+        self.summary_action_frame.grid_columnconfigure(0, weight=1)
+        self.summary_action_frame.grid_columnconfigure(1, weight=1)
+
+        # Button Styles
+        style.configure("Red.TButton", background="red", foreground="white", font=("Arial", 12, "bold"))
+        style.configure("Green.TButton", background="green", foreground="white", font=("Arial", 12, "bold"))
+
+
+        # Method to refresh the category summary and fetch data from DB
+    def refresh_category_summary(self):
+            # Fetch the category summary data from DB
+            connection = sqlite3.connect("inventory.db")
+            cursor = connection.cursor()
+           
+            # Query to get total amount and quantity available by category
+            cursor.execute("""
+                SELECT category, SUM(price * quantity) AS total_amount, SUM(quantity) AS total_quantity
+                FROM products
+                GROUP BY category
+            """)
+            category_data = cursor.fetchall()
+            connection.close()
+
+            # Clear current treeview
+            for item in self.category_summary_list.get_children():
+                self.category_summary_list.delete(item)
+
+            # Insert the new data into the treeview
+            total_sum = 0  # To calculate the overall total amount
+            for data in category_data:
+                category, total_amount, total_quantity = data
+                total_sum += total_amount  # Add the total amount for each category to the sum
+                self.category_summary_list.insert("", "end", values=(category, f" ₹{total_amount:.2f}", total_quantity))
+
+            # Insert the total row at the end of the treeview
+            self.category_summary_list.insert("", "end", values=("Total", f" ₹{total_sum:.2f}", ""))
+
+            # Now save the data to a CSV file
+            with open("category_summary.csv", "a", newline="") as csvfile:
+                csv_writer = csv.writer(csvfile)
+               
+                # Write the category data to CSV
+                for data in category_data:
+                    category, total_amount, total_quantity = data
+                    csv_writer.writerow([category, f"₹{total_amount:.2f}", total_quantity])
+               
+                # Write the total amount row at the end
+                csv_writer.writerow(["Total", f"₹{total_sum:.2f}", ""])
+
+
+# Optional: Export to CSV (if required)
+    def export_category_summary_to_csv(self):
+        try:
+            # Get the data from the Treeview
+            category_data = [
+                (self.category_summary_list.item(item, "values"))
+                for item in self.category_summary_list.get_children()
+            ]
+           
+            # Specify the file path for the CSV
+            file_path = filedialog.asksaveasfilename(
+                defaultextension=".csv",
+                filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+            )
+           
+            if file_path:
+                with open(file_path, mode="w", newline="", encoding="utf-8") as file:
+                    writer = csv.writer(file)
+                    # Write header
+                    writer.writerow(["Category", "Total Amount", "Quantity Available"])
+                    # Write data
+                    writer.writerows(category_data)
+                messagebox.showinfo("Export Successful", "Data exported successfully to CSV.")
+        except Exception as e:
+            messagebox.showerror("Export Failed", f"An error occurred: {e}")
+
+
+    def add_product(self):
+        # Example logic for adding product
+        product_name = self.name_var.get()
+        description = self.description_entry.get()
+        category = self.category_var.get()
+        price = self.price_entry.get()
+        quantity = self.quantity_entry.get()
+       
+        if not product_name or not description or not category or not price or not quantity:
+            messagebox.showerror("Error", "All fields are required!")
+            return
+       
+        # Save product to the database or data structure
+        try:
+            connection = sqlite3.connect("inventory.db")
+            cursor = connection.cursor()
+            cursor.execute("""
+                INSERT INTO products (name, description, category, price, quantity)
+                VALUES (?, ?, ?, ?, ?)
+            """, (product_name, description, category, float(price), int(quantity)))
+            connection.commit()
+            connection.close()
+
+            messagebox.showinfo("Success", "Product added successfully!")
+            self.clear_add_product_fields()  # Clear input fields after successful add
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to add product: {e}")
+
+    def clear_add_product_fields(self):
+        # Clear the product input fields
+        self.name_var.set("")  # Clear the Name Combobox
+        self.description_entry.delete(0, tk.END)  # Clear the Description Entry
+        self.category_var.set("")  # Clear the Category Dropdown
+        self.price_entry.delete(0, tk.END)  # Clear the Price Entry
+        self.quantity_entry.delete(0, tk.END)  # Clear the Quantity Entry
+
+
+
+    def search_products_in_db(self):
+        category = self.search_category_var.get()
+        description = self.search_description_entry.get()
+        results = search_products(category, description)
+
+        # Clear existing rows in Treeview
+        for row in self.product_tree.get_children():
+            self.product_tree.delete(row)
+
+        for result in results:
+            self.product_tree.insert("", "end", values=result)
+
+if __name__ == "__main__":
+    setup_database()  # Initialize the database when the app starts
+    root = tk.Tk()
+    login_page = LoginPage(root)
+    root.mainloop()
+   
+#(CREATE TABLE IF NOT EXISTS categories (
+    #id INTEGER PRIMARY KEY AUTOINCREMENT,
+    #category_name TEXT NOT NULL UNIQUE
+#);)
+
